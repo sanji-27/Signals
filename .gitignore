@@ -2,4 +2,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 .env
-temp_olymp/
+src/data/*.csv
+src/data/*.sqlite
+logs/
