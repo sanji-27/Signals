@@ -6,6 +6,6 @@ python-telegram-bot
 pyyaml
 python-dotenv
 websockets
-requests
 joblib
 feedparser
+aiohttp

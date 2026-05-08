@@ -1,7 +1,8 @@
-import requests
+import aiohttp
 import pandas as pd
 import logging
 import os
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -10,14 +11,12 @@ class AlphaVantageClient:
         self.api_key = api_key or os.getenv("ALPHA_VANTAGE_API_KEY")
         self.base_url = "https://www.alphavantage.co/query"
 
-    def get_candles(self, symbol: str, interval: str = "5min") -> pd.DataFrame:
-        """Fetch historical candles as fallback."""
+    async def get_candles(self, symbol: str, interval: str = "5min") -> pd.DataFrame:
+        """Fetch historical candles as fallback using aiohttp."""
         if not self.api_key:
             logger.warning("Alpha Vantage API Key missing. Fallback unavailable.")
             return pd.DataFrame()
 
-        # Map Olymp Trade symbols to Forex symbols if needed
-        # Simple mapping for major pairs
         av_symbol = symbol.replace("/", "")
         if "_OTC" in av_symbol:
             av_symbol = av_symbol.replace("_OTC", "")
@@ -32,12 +31,17 @@ class AlphaVantageClient:
         }
 
         try:
-            response = requests.get(self.base_url, params=params)
-            data = response.json()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.base_url, params=params) as response:
+                    if response.status != 200:
+                        logger.error(f"Alpha Vantage request failed with status {response.status}")
+                        return pd.DataFrame()
+
+                    data = await response.json()
 
             key = f"Time Series FX ({interval})"
             if key not in data:
-                logger.error(f"Alpha Vantage error: {data.get('Note', 'Unknown error')}")
+                logger.error(f"Alpha Vantage error: {data.get('Note', 'Unknown error') or data.get('Information', 'Unknown')}")
                 return pd.DataFrame()
 
             df = pd.DataFrame.from_dict(data[key], orient='index')

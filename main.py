@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import signal
+import os
 from config.config import Config
 from src.agents.data_agent import DataAgent
 from src.agents.analyst_agent import TechnicalAnalystAgent
@@ -10,6 +11,7 @@ from src.agents.risk_manager import RiskManagerAgent
 from src.agents.learner_agent import LearnerAgent
 from src.utils.notifier import TelegramNotifier
 from src.utils.journal import TradeJournal
+from src.utils.health_check import start_health_check
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +42,10 @@ class TradingBot:
 
     async def start(self):
         logger.info("🚀 Starting Advanced Multi-Agent Trading Bot...")
+
+        # Start health check server
+        asyncio.create_task(start_health_check())
+
         await self.data_agent.start()
 
         # Sync Initial Balance

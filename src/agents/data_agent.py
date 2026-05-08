@@ -27,7 +27,9 @@ class DataAgent:
 
         for asset in Config.ASSETS + Config.OTC_ASSETS:
             try:
-                await self.client.market.subscribe_candles(asset, size=60)
+                # Subscribing to 5m and 15m as they are core to our signals
+                await self.client.market.subscribe_candles(asset, size=300)
+                await self.client.market.subscribe_candles(asset, size=900)
                 # Request initial historical data
                 await self.refresh_candles(asset)
             except Exception as e:
@@ -40,22 +42,22 @@ class DataAgent:
         for a in assets:
             if self.client.connection.is_connected:
                 try:
-                    await self.client.send_request(10, [{"pair": a, "size": 300, "solid": True}]) # 5m
-                    await self.client.send_request(10, [{"pair": a, "size": 900, "solid": True}]) # 15m
+                    await self.client.market.get_candles(a, size=300, count=100)
+                    await self.client.market.get_candles(a, size=900, count=100)
                 except Exception as e:
                     logger.warning(f"WS Candle request failed for {a}: {e}")
-                    self._load_fallback(a)
+                    await self._load_fallback(a)
             else:
-                self._load_fallback(a)
+                await self._load_fallback(a)
 
-    def _load_fallback(self, asset: str):
+    async def _load_fallback(self, asset: str):
         """Fetch data from Alpha Vantage as fallback."""
         logger.info(f"Using fallback data for {asset}")
-        df_5m = self.fallback.get_candles(asset, "5min")
+        df_5m = await self.fallback.get_candles(asset, "5min")
         if not df_5m.empty:
             self._update_internal_buffer(asset, 300, df_5m)
 
-        df_15m = self.fallback.get_candles(asset, "15min")
+        df_15m = await self.fallback.get_candles(asset, "15min")
         if not df_15m.empty:
             self._update_internal_buffer(asset, 900, df_15m)
 

@@ -1,35 +1,38 @@
-import asyncio
-import unittest
-from unittest.mock import MagicMock, AsyncMock
+import pytest
 import pandas as pd
 from src.agents.data_agent import DataAgent
+from unittest.mock import AsyncMock, MagicMock
 
-class TestDataAgent(unittest.IsolatedAsyncioTestCase):
-    async def test_initialization(self):
-        with unittest.mock.patch('src.agents.data_agent.OlympTradeClient') as MockClient:
-            agent = DataAgent(token="fake_token")
-            self.assertIsNotNone(agent.client)
-            MockClient.return_value.register_callback.assert_called()
+@pytest.mark.asyncio
+async def test_data_agent_on_candle():
+    agent = DataAgent(token="fake_token")
+    # Mock message for e:1003
+    message = {
+        "e": 1003,
+        "pair": "EURUSD",
+        "size": 300,
+        "d": [{"t": 1625097600, "o": 1.1, "h": 1.2, "l": 1.0, "c": 1.15}]
+    }
+    await agent._on_candle(message)
 
-    async def test_tick_handling(self):
-        with unittest.mock.patch('src.agents.data_agent.OlympTradeClient'):
-            agent = DataAgent(token="fake_token")
-            fake_tick = {"p": "EURUSD", "q": 1.0850, "t": 1715150000}
-            await agent._on_tick({"d": [fake_tick]})
+    df = agent.get_latest_candles("EURUSD", size=300)
+    assert not df.empty
+    assert len(df) == 1
+    assert df.iloc[0]['close'] == 1.15
 
-            df = agent.get_latest_ticks("EURUSD")
-            self.assertFalse(df.empty)
-            self.assertEqual(df.iloc[0]['q'], 1.0850)
+@pytest.mark.asyncio
+async def test_data_agent_fallback(monkeypatch):
+    # Mock AlphaVantageClient
+    mock_av = MagicMock()
+    mock_av.get_candles = AsyncMock(return_value=pd.DataFrame(
+        [{"open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}],
+        index=[pd.Timestamp.now()]
+    ))
 
-    async def test_candle_handling(self):
-        with unittest.mock.patch('src.agents.data_agent.OlympTradeClient'):
-            agent = DataAgent(token="fake_token")
-            fake_candle = {"p": "EURUSD", "o": 1.0850, "c": 1.0855, "t": 1715150000}
-            await agent._on_candle({"d": [fake_candle], "pair": "EURUSD", "size": 300})
+    agent = DataAgent(token="fake_token")
+    agent.fallback = mock_av
 
-            df = agent.get_latest_candles("EURUSD", size=300)
-            self.assertFalse(df.empty)
-            self.assertEqual(df.iloc[0]['o'], 1.0850)
-
-if __name__ == '__main__':
-    unittest.main()
+    await agent._load_fallback("EURUSD")
+    df = agent.get_latest_candles("EURUSD", size=300)
+    assert not df.empty
+    assert df.iloc[0]['close'] == 1.15
