@@ -1,0 +1,12 @@
+pandas
+pandas_ta
+numpy
+asyncio
+python-telegram-bot
+pyyaml
+python-dotenv
+websockets
+requests
+joblib
+feedparser
+git+https://github.com/ChipaDevTeam/OlympTradeAPI.git
