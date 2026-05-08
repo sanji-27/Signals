@@ -18,7 +18,6 @@ class DataAgent:
         # Register callbacks
         self.client.register_callback(1, self._on_tick)
         self.client.register_callback(1003, self._on_candle)
-        # Trade events: 26 is trade closed
         self.client.register_callback(26, self._on_trade_closed)
 
     async def start(self):
@@ -29,10 +28,20 @@ class DataAgent:
         for asset in Config.ASSETS + Config.OTC_ASSETS:
             try:
                 await self.client.market.subscribe_ticks(asset)
-                for size in [60, 300, 900]:
+                # Request initial historical data
+                for size in [300, 900]:
                     await self.client.send_request(10, [{"pair": asset, "size": size, "solid": True}])
             except Exception as e:
                 logger.error(f"Failed to subscribe to {asset}: {e}")
+
+    async def refresh_candles(self):
+        """Manually trigger a refresh of the candle data."""
+        for asset in Config.ASSETS + Config.OTC_ASSETS:
+            for size in [300, 900]:
+                try:
+                    await self.client.send_request(10, [{"pair": asset, "size": size, "solid": True}])
+                except Exception as e:
+                    logger.error(f"Failed to refresh candles for {asset}: {e}")
 
     async def stop(self):
         await self.client.stop()
@@ -54,28 +63,25 @@ class DataAgent:
             key = f"{pair}_{size}" if size else pair
             if key not in self._raw_candles:
                 self._raw_candles[key] = []
+
             self._raw_candles[key].extend(candles)
-            if len(self._raw_candles[key]) > self.max_buffer_size:
-                self._raw_candles[key] = self._raw_candles[key][-self.max_buffer_size:]
+            df_temp = pd.DataFrame(self._raw_candles[key])
+            if not df_temp.empty and 't' in df_temp.columns:
+                df_temp = df_temp.drop_duplicates(subset=['t']).sort_values('t')
+                self._raw_candles[key] = df_temp.tail(self.max_buffer_size).to_dict('records')
 
     async def _on_trade_closed(self, message: dict):
-        """Handle trade closure and trigger updates."""
         trade_data = message.get("d", [])
         if not trade_data:
             return
-
         trade = trade_data[0]
         asset = trade.get("pair")
         pnl = trade.get("balance_change", 0.0)
         outcome = "WIN" if pnl > 0 else "LOSS"
-
-        logger.info(f"Trade Closed: {asset}, Result: {outcome}, PnL: {pnl}")
-
         if self.on_trade_result:
             self.on_trade_result(asset, outcome, pnl)
 
     def get_latest_ticks(self, pair: str, limit: int = 100) -> pd.DataFrame:
-        """Return the latest available ticks for a pair."""
         ticks = self._raw_ticks.get(pair, [])[-limit:]
         if not ticks:
             return pd.DataFrame()
@@ -88,10 +94,6 @@ class DataAgent:
     def get_latest_candles(self, pair: str, size: int = 300, limit: int = 100) -> pd.DataFrame:
         key = f"{pair}_{size}"
         candles = self._raw_candles.get(key, [])[-limit:]
-        if not candles:
-            # Try plain pair if size-specific not found
-            candles = self._raw_candles.get(pair, [])[-limit:]
-
         if not candles:
             return pd.DataFrame()
         df = pd.DataFrame(candles)

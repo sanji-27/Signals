@@ -9,4 +9,3 @@ websockets
 requests
 joblib
 feedparser
-git+https://github.com/ChipaDevTeam/OlympTradeAPI.git

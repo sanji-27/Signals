@@ -8,6 +8,7 @@ Professional, modular, self-learning trading bot for Olymp Trade.
 - Strict Risk Management (Max 1% risk per trade).
 - Telegram Integration for signal notifications.
 - Supports Forex, Composites, and OTC assets.
+- Bundle-ready for easy deployment (e.g., Render, Railway).
 
 ## Installation
 
@@ -22,13 +23,7 @@ Professional, modular, self-learning trading bot for Olymp Trade.
    pip install -r requirements.txt
    ```
 
-3. Install the `olymptrade-api` library:
-   ```bash
-   # Since it's currently not on PyPI, install from the provided temp_olymp folder or GitHub
-   pip install -e temp_olymp
-   ```
-
-4. Configure your environment:
+3. Configure your environment:
    - Copy `config/.env.example` to `config/.env`.
    - Fill in your `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `OLYMP_TRADE_TOKEN`.
 
@@ -38,7 +33,6 @@ Professional, modular, self-learning trading bot for Olymp Trade.
 3. Refresh the page or perform an action.
 4. Look for WebSocket connections or requests to the API.
 5. In the request headers or messages, find the `token` or `ssid`.
-   - *Note: Detailed instructions may vary; look for authorization headers in API calls.*
 
 ## Usage
 Run the bot using:
@@ -50,4 +44,5 @@ python main.py
 - `src/agents/`: Specialized agents for data, analysis, and risk.
 - `src/utils/`: Utility functions for logging, notifications, etc.
 - `config/`: Configuration files and environment variables.
+- `olymptrade_ws/`: Bundled Olymp Trade API library.
 - `tests/`: Unit and integration tests.

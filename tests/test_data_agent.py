@@ -25,11 +25,9 @@ class TestDataAgent(unittest.IsolatedAsyncioTestCase):
         with unittest.mock.patch('src.agents.data_agent.OlympTradeClient'):
             agent = DataAgent(token="fake_token")
             fake_candle = {"p": "EURUSD", "o": 1.0850, "c": 1.0855, "t": 1715150000}
-            # Message now expects pair or infers from candles
-            await agent._on_candle({"d": [fake_candle]})
+            await agent._on_candle({"d": [fake_candle], "pair": "EURUSD", "size": 300})
 
-            # Default size is 300
-            df = agent.get_latest_candles("EURUSD", size=None)
+            df = agent.get_latest_candles("EURUSD", size=300)
             self.assertFalse(df.empty)
             self.assertEqual(df.iloc[0]['o'], 1.0850)
 

@@ -27,12 +27,9 @@ class TradingBot:
         self.notifier = TelegramNotifier()
         self.risk_manager = RiskManagerAgent(initial_balance=1000.0)
         self.journal = TradeJournal()
-
-        # Link trade results to risk manager and journal
         self.data_agent.on_trade_result = self.handle_trade_result
 
     def handle_trade_result(self, asset: str, outcome: str, pnl: float):
-        """Update bot state when a trade closes."""
         self.risk_manager.record_result(pnl)
         self.journal.update_outcome(asset, outcome, pnl)
         logger.info(f"Updated bot state for {asset}. New balance: {self.risk_manager.balance}")
@@ -44,9 +41,11 @@ class TradingBot:
         logger.info("Bot is active and monitoring markets...")
 
         try:
+            count = 0
             while True:
-                # Reset daily risk at midnight (simplified)
-                # self.risk_manager.reset_daily(self.risk_manager.balance)
+                # Refresh candles every 5 minutes to ensure data freshness
+                if count % 5 == 0:
+                    await self.data_agent.refresh_candles()
 
                 for asset in Config.ASSETS + Config.OTC_ASSETS:
                     df_5m = self.data_agent.get_latest_candles(asset, size=300, limit=100)
@@ -62,15 +61,11 @@ class TradingBot:
 
                     if decision['action'] != "wait":
                         if self.risk_manager.approve_trade(decision['confidence']):
-                            # Log signal
                             self.journal.log_signal(decision)
-                            # Notify
                             await self.notifier.send_signal(decision)
                             logger.info(f"SIGNAL DETECTED: {asset} {decision['action']} at {decision['confidence']*100}% confidence")
 
-                            # Note: To fully close the loop, we'd place the trade here
-                            # await self.data_agent.client.trade.place_trade(...)
-
+                count += 1
                 await asyncio.sleep(60)
         except asyncio.CancelledError:
             logger.info("Bot loop stopped")
