@@ -1,48 +1,32 @@
-# OlympTrade "Sure Signal" Multi-Agent Bot
+# 🚀 Olymp Trade "Sure Signal" Bot
 
-Professional, modular, self-learning trading bot for Olymp Trade.
+Advanced multi-agent trading bot for Olymp Trade focusing on high-accuracy (95%+) signals using technical confluence and multi-timeframe alignment.
 
-## Features
-- Multi-Agent Architecture (Data, Technical Analysis, Market Regime, News, Risk, Ensemble).
-- Target 95%+ accuracy with "Sure Signals".
-- Strict Risk Management (Max 1% risk per trade).
-- Telegram Integration for signal notifications.
-- Supports Forex, Composites, and OTC assets.
-- Bundle-ready for easy deployment (e.g., Render, Railway).
+## 🏗️ Architecture
+- **Data Agent**: Real-time WebSocket management with auto-reconnect and Alpha Vantage fallback.
+- **Technical Analyst**: 50+ indicators via `pandas_ta` (Supertrend, Ichimoku, RSI, etc.).
+- **Ensemble Oracle**: Reasoning agent that only approves signals meeting strict criteria.
+- **Risk Manager**: Capital preservation agent (1% trade risk, 3% daily drawdown).
+- **News Agent**: Sentiment analysis from global economic feeds.
+- **Learner Agent**: Weekly performance auditing and retraining suggestions.
 
-## Installation
+## 🛠️ Setup
 
-1. Clone the repository:
-   ```bash
-   git clone <repository_url>
-   cd signals
-   ```
-
-2. Install the required dependencies:
+1. **Clone the repository.**
+2. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
+3. **Configure Environment**:
+   - Rename `config/.env.example` to `config/.env`.
+   - Add your `OLYMP_TRADE_TOKEN`.
+   - Add your `TELEGRAM_BOT_TOKEN` and `CHAT_ID`.
+   - (Optional) Add `ALPHA_VANTAGE_API_KEY` for fallback data.
 
-3. Configure your environment:
-   - Copy `config/.env.example` to `config/.env`.
-   - Fill in your `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `OLYMP_TRADE_TOKEN`.
+4. **Run the Bot**:
+   ```bash
+   python main.py
+   ```
 
-### How to get Olymp Trade Access Token
-1. Open Olymp Trade in your browser and log in.
-2. Open Developer Tools (F12) -> Network tab.
-3. Refresh the page or perform an action.
-4. Look for WebSocket connections or requests to the API.
-5. In the request headers or messages, find the `token` or `ssid`.
-
-## Usage
-Run the bot using:
-```bash
-python main.py
-```
-
-## Structure
-- `src/agents/`: Specialized agents for data, analysis, and risk.
-- `src/utils/`: Utility functions for logging, notifications, etc.
-- `config/`: Configuration files and environment variables.
-- `olymptrade_ws/`: Bundled Olymp Trade API library.
-- `tests/`: Unit and integration tests.
+## ⚠️ Disclaimer
+Trading involves risk. This bot is for educational and assistant purposes only. Always test in Demo mode first.

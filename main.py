@@ -7,6 +7,7 @@ from src.agents.analyst_agent import TechnicalAnalystAgent
 from src.agents.ensemble_agent import MarketRegimeAgent, EnsembleOracleAgent
 from src.agents.news_agent import NewsAgent
 from src.agents.risk_manager import RiskManagerAgent
+from src.agents.learner_agent import LearnerAgent
 from src.utils.notifier import TelegramNotifier
 from src.utils.journal import TradeJournal
 
@@ -25,27 +26,43 @@ class TradingBot:
         self.news_agent = NewsAgent()
         self.ensemble = EnsembleOracleAgent(self.analyst, self.regime_agent, self.news_agent)
         self.notifier = TelegramNotifier()
-        self.risk_manager = RiskManagerAgent(initial_balance=1000.0)
+        self.risk_manager = RiskManagerAgent()
         self.journal = TradeJournal()
+        self.learner = LearnerAgent()
+
+        # Link callbacks
         self.data_agent.on_trade_result = self.handle_trade_result
 
     def handle_trade_result(self, asset: str, outcome: str, pnl: float):
         self.risk_manager.record_result(pnl)
         self.journal.update_outcome(asset, outcome, pnl)
-        logger.info(f"Updated bot state for {asset}. New balance: {self.risk_manager.balance}")
+        logger.info(f"Trade Result: {asset} {outcome} PnL: {pnl}")
 
     async def start(self):
-        logger.info("Starting Multi-Agent Trading Bot...")
+        logger.info("🚀 Starting Advanced Multi-Agent Trading Bot...")
         await self.data_agent.start()
+
+        # Sync Initial Balance
+        balance = self.data_agent.client.current_balance_value
+        self.risk_manager.sync_balance(balance)
 
         logger.info("Bot is active and monitoring markets...")
 
         try:
             count = 0
             while True:
-                # Refresh candles every 5 minutes to ensure data freshness
-                if count % 5 == 0:
+                # Sync balance periodically
+                balance = self.data_agent.client.current_balance_value
+                if balance > 0:
+                    self.risk_manager.sync_balance(balance)
+
+                # Periodic refresh and weekly summary check
+                if count % 60 == 0: # Every hour
                     await self.data_agent.refresh_candles()
+
+                if count % (60 * 24 * 7) == 0 and count > 0: # Weekly
+                    summary = self.learner.generate_weekly_summary()
+                    await self.notifier.send_message(summary)
 
                 for asset in Config.ASSETS + Config.OTC_ASSETS:
                     df_5m = self.data_agent.get_latest_candles(asset, size=300, limit=100)
@@ -61,9 +78,13 @@ class TradingBot:
 
                     if decision['action'] != "wait":
                         if self.risk_manager.approve_trade(decision['confidence']):
+                            # Calculate position size
+                            amount = self.risk_manager.calculate_position_size()
+                            decision['amount'] = amount
+
                             self.journal.log_signal(decision)
                             await self.notifier.send_signal(decision)
-                            logger.info(f"SIGNAL DETECTED: {asset} {decision['action']} at {decision['confidence']*100}% confidence")
+                            logger.info(f"✅ SIGNAL: {asset} {decision['action']} ({decision['confidence']*100:.1f}%)")
 
                 count += 1
                 await asyncio.sleep(60)
@@ -78,14 +99,11 @@ async def main():
     stop_event = asyncio.Event()
 
     def handle_signal():
-        logger.info("Shutdown signal received")
         stop_event.set()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            loop.add_signal_handler(sig, handle_signal)
-        except NotImplementedError:
-            pass
+        try: loop.add_signal_handler(sig, handle_signal)
+        except NotImplementedError: pass
 
     bot_task = asyncio.create_task(bot.start())
     await stop_event.wait()

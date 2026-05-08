@@ -4,44 +4,51 @@ from config.config import Config
 logger = logging.getLogger(__name__)
 
 class RiskManagerAgent:
-    def __init__(self, initial_balance: float):
+    """Enforces capital preservation and position sizing."""
+    def __init__(self, initial_balance: float = 0.0):
         self.balance = initial_balance
         self.daily_start_balance = initial_balance
         self.consecutive_losses = 0
         self.daily_loss = 0.0
+        self._is_synced = False
+
+    def sync_balance(self, current_balance: float):
+        """Update internal balance from live API."""
+        if not self._is_synced or self.daily_start_balance == 0:
+            self.daily_start_balance = current_balance
+            self._is_synced = True
+
+        self.balance = current_balance
+        logger.info(f"RiskManager synced. Balance: {self.balance}")
 
     def approve_trade(self, confidence: float) -> bool:
-        """Check if a trade is allowed based on risk rules."""
+        """Strict logic for signal approval."""
         if confidence < Config.MIN_CONFIDENCE:
-            logger.info(f"Trade rejected: Confidence {confidence} below minimum {Config.MIN_CONFIDENCE}")
             return False
 
-        if self.daily_loss >= Config.MAX_DAILY_LOSS * self.daily_start_balance:
-            logger.warning("Trade rejected: Daily drawdown limit reached")
-            return False
+        # Drawdown check
+        if self.daily_start_balance > 0:
+            current_drawdown = (self.daily_start_balance - self.balance) / self.daily_start_balance
+            if current_drawdown >= Config.MAX_DAILY_LOSS:
+                logger.warning(f"Daily drawdown limit hit: {current_drawdown*100:.2f}%")
+                return False
 
         if self.consecutive_losses >= Config.MAX_CONSECUTIVE_LOSSES:
-            logger.warning("Trade rejected: Max consecutive losses reached")
+            logger.warning(f"Max consecutive losses hit: {self.consecutive_losses}")
             return False
 
         return True
 
     def calculate_position_size(self) -> float:
-        """Calculate trade amount based on account risk."""
+        """Return trade amount based on account risk %."""
         amount = self.balance * Config.MAX_RISK_PER_TRADE
-        # Ensure minimum trade amount (e.g., $1)
-        return max(amount, 1.0)
+        return round(max(amount, 1.0), 2)
 
     def record_result(self, pnl: float):
-        """Update risk metrics after a trade."""
-        self.balance += pnl
+        """Update metrics after trade close."""
         if pnl < 0:
             self.consecutive_losses += 1
-            self.daily_loss += abs(pnl)
         else:
             self.consecutive_losses = 0
 
-    def reset_daily(self, current_balance: float):
-        """Reset daily tracking."""
-        self.daily_start_balance = current_balance
-        self.daily_loss = 0.0
+        # Balance will be updated via sync_balance from main loop or callback
